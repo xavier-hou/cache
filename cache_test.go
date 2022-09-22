@@ -200,8 +200,9 @@ func TestLFU(t *testing.T) {
 	res := make([]string, 0)
 	k = 0
 	for p != nil {
-		assert.Equal(t, arr[k], p.Value.(*data.CacheData).Key)
-		res = append(res, p.Value.(*data.CacheData).Key)
+		data.Get(p.Value, data.TKey)
+		assert.Equal(t, arr[k], data.Get(p.Value, data.TKey).(string))
+		res = append(res, data.Get(p.Value, data.TKey).(string))
 		p = p.Next()
 		k++
 	}

@@ -23,8 +23,6 @@ type Cache struct {
 
 	list            *list.List
 	adjustEvictFunc AdjustEvictFunc
-
-	nexNum int
 }
 
 func New(adjustEvictFunc AdjustEvictFunc, mLen int) *Cache {
@@ -39,7 +37,6 @@ func New(adjustEvictFunc AdjustEvictFunc, mLen int) *Cache {
 		cMap:            make(map[string]*list.Element, mLen),
 		list:            list.New(),
 		adjustEvictFunc: adjustEvictFunc,
-		nexNum:          0,
 	}
 
 	return c
@@ -67,20 +64,17 @@ func (c *Cache) Add(key string, obj interface{}) error {
 		if elm == nil {
 			return fmt.Errorf("internal error happen, when eviction strategy is triggered but the back element of list is nil")
 		}
+
+		delete(c.cMap, data.Get(elm.Value, data.TKey).(string))
 		c.list.Remove(elm)
-		delete(c.cMap, elm.Value.(*data.CacheData).Key)
 		c.curLen--
 	}
 
 	// 此处的缓存空间是足够的，按照正常流程构造新的元素及列表
-	cd := &data.CacheData{
-		Visit: 0,
-		Key:   key,
-		Value: obj,
-	}
+	v := data.Data(key, obj)
 
 	// 将修改后的底层数据加入链表中
-	elm := c.list.PushFront(cd)
+	elm := c.list.PushFront(v)
 
 	// 设置cache map与链表元素对应关系
 	c.cMap[key] = elm
@@ -90,7 +84,6 @@ func (c *Cache) Add(key string, obj interface{}) error {
 
 	// 设置一些全局变量
 	c.curLen++
-	c.nexNum++
 	return nil
 }
 
@@ -128,15 +121,8 @@ func (c *Cache) Update(key string, obj any) error {
 		return fmt.Errorf("key %q does not exist", key)
 	}
 
-	// 修改cacheData存储的数据与记录
-	cd, assert := elm.Value.(*data.CacheData)
-	if !assert {
-		return fmt.Errorf("internal error happen, when element %v value is not cacheData type", elm.Value)
-	}
-	cd.Visit++
-	cd.Value = obj
-
-	// elm.Value = cd
+	data.Set(elm.Value, data.TVisit, data.Get(elm.Value, data.TVisit).(int)+1)
+	data.Set(elm.Value, data.TValue, obj)
 
 	// 根据失效淘汰策略更新函数调整链表
 	c.adjustEvictFunc(elm, c.list)
@@ -158,13 +144,8 @@ func (c *Cache) Get(key string) (any, error) {
 		return nil, fmt.Errorf("key %q does not exist", key)
 	}
 
-	cd, assert := elm.Value.(*data.CacheData)
-	if !assert {
-		panic(fmt.Errorf("assert failed when update cache"))
-	}
-	cd.Visit++
-
+	data.Set(elm.Value, data.TVisit, data.Get(elm.Value, data.TVisit).(int)+1)
 	// 根据失效淘汰策略更新函数调整链表
 	c.adjustEvictFunc(elm, c.list)
-	return cd.Value, nil
+	return data.Get(elm.Value, data.TValue), nil
 }

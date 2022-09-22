@@ -3,7 +3,6 @@ package evict
 import (
 	"cache/data"
 	"container/list"
-	"fmt"
 )
 
 func LFUAdjustEvictFunc(elm *list.Element, l *list.List) {
@@ -15,15 +14,9 @@ func LFUAdjustEvictFunc(elm *list.Element, l *list.List) {
 
 	for p != nil {
 		// 找到第一个访问度比elm小的,elm放在其前面
-		pVisit, err := DataVisit(p.Value)
-		if err != nil {
-			panic(err)
-		}
+		pVisit := data.Get(p.Value, data.TVisit).(int)
+		elmVisit := data.Get(elm.Value, data.TVisit).(int)
 
-		elmVisit, err := DataVisit(elm.Value)
-		if err != nil {
-			panic(err)
-		}
 		if pVisit < elmVisit {
 			break
 		}
@@ -36,12 +29,4 @@ func LFUAdjustEvictFunc(elm *list.Element, l *list.List) {
 	}
 
 	l.MoveToBack(elm)
-}
-
-func DataVisit(value any) (int, error) {
-	e, ok := value.(*data.CacheData)
-	if !ok {
-		return -1, fmt.Errorf("get visit from data %v failed, it's not cacheData type", value)
-	}
-	return e.Visit, nil
 }
